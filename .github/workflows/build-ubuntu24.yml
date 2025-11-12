@@ -4,9 +4,14 @@ on:
   push:
     branches:
       - '**'  # Build on all branches
+    tags:
+      - 'v*'  # Trigger on version tags
   pull_request:
     branches:
       - '**'
+
+permissions:
+  contents: write  # Required to upload release assets
 
 jobs:
   build:
