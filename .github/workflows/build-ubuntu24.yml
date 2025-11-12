@@ -1,0 +1,59 @@
+name: Build Ubuntu 24.04 Package
+
+on:
+  push:
+    branches:
+      - '**'  # Build on all branches
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for git describe
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Ubuntu 24.04 package
+        run: make build-ubuntu24
+
+      - name: Download libssl1.1 deb package
+        run: |
+          wget -O /tmp/nrbrtx.asc 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x19bfcaf5168d33a9'
+          echo "deb [signed-by=/tmp/nrbrtx.asc] https://ppa.launchpadcontent.net/nrbrtx/libssl1/ubuntu jammy main" | sudo tee /etc/apt/sources.list.d/nrbrt.list
+          sudo apt-get update
+          cd binaries
+          apt-get download libssl1.1
+          ls -lah libssl1.1*.deb
+
+      - name: List generated binaries
+        run: ls -lah binaries/
+
+      - name: Upload binaries as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: proxysql-mysqlbinlog-ubuntu24-${{ github.sha }}
+          path: |
+            binaries/proxysql-mysqlbinlog_*ubuntu24*.deb
+            binaries/proxysql_binlog_reader-*ubuntu24*
+            binaries/libssl1.1*.deb
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload to Release (on tags)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            binaries/proxysql-mysqlbinlog_*ubuntu24*.deb
+            binaries/proxysql_binlog_reader-*ubuntu24*
+            binaries/libssl1.1*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
